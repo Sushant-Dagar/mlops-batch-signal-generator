@@ -1,0 +1,8 @@
+2026-03-29 04:47:59 | INFO | === Job started ===
+2026-03-29 04:47:59 | INFO | Config loaded — seed=42, window=5, version=v1
+2026-03-29 04:47:59 | INFO | Random seed set to 42
+2026-03-29 04:47:59 | INFO | Loaded 10000 rows from data.csv
+2026-03-29 04:47:59 | INFO | Computed rolling mean with window=5
+2026-03-29 04:47:59 | INFO | Generated signals — 9996 valid rows (excluded 4 leading NaN rows)
+2026-03-29 04:47:59 | INFO | Metrics — rows=10000, signal_rate=0.4991, latency=75ms
+2026-03-29 04:47:59 | INFO | === Job completed successfully ===
