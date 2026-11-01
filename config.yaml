@@ -1,3 +1,14 @@
 seed: 42
 window: 5
-version: "v1"
+version: "v2"
+
+# Optional: remove this block to run the signal job only.
+backtest:
+  fee_bps: 1.0            # exchange fee per side, basis points
+  slippage_bps: 1.0       # assumed slippage per side, basis points
+  max_position: 1.0       # fraction of equity held when long
+  stop_loss_pct: 0.005    # close a trade 0.5% below entry
+  max_drawdown_pct: 0.10  # kill switch: stop trading at a 10% drawdown
+  walk_forward:
+    windows: [5, 20, 60, 240]
+    folds: 4

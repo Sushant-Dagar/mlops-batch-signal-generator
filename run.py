@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from backtest import BacktestConfig, config_dict, run_backtest, walk_forward
+from signals import rolling_mean_signal
+
 
 def setup_logging(log_file: str) -> logging.Logger:
     logger = logging.getLogger("mlops_task")
@@ -76,18 +79,39 @@ def load_data(input_path: str, logger: logging.Logger) -> pd.DataFrame:
 
 
 def compute_signal(df: pd.DataFrame, window: int, logger: logging.Logger) -> pd.Series:
-    rolling_mean = df["close"].rolling(window=window).mean()
+    signal = rolling_mean_signal(df["close"], window)
+    valid = df["close"].rolling(window=window).mean().notna()
     logger.info("Computed rolling mean with window=%d", window)
-
-    # Rows where rolling_mean is NaN (first window-1 rows) get signal=0
-    signal = (df["close"] > rolling_mean).astype(int)
-    signal[rolling_mean.isna()] = 0
     logger.info(
         "Generated signals — %d valid rows (excluded %d leading NaN rows)",
-        rolling_mean.notna().sum(),
-        rolling_mean.isna().sum(),
+        valid.sum(), (~valid).sum(),
     )
     return signal
+
+
+def run_backtests(df: pd.DataFrame, signal: pd.Series, config: dict,
+                  logger: logging.Logger) -> dict:
+    """Backtest the signal and, if configured, run a walk-forward test."""
+    raw = config.get("backtest") or {}
+    bt_cfg = BacktestConfig.from_dict(raw)
+    result = run_backtest(df["close"], signal, bt_cfg)
+    out = {"config": config_dict(bt_cfg), "metrics": result["metrics"]}
+    m = result["metrics"]
+    logger.info(
+        "Backtest — return=%.2f%%, sharpe=%.2f, max_dd=%.2f%%, trades=%d, costs=%.2f%%",
+        m["total_return_pct"], m["sharpe_annualized"], m["max_drawdown_pct"],
+        m["num_trades"], m["total_cost_pct"],
+    )
+
+    wf = raw.get("walk_forward")
+    if wf:
+        out["walk_forward"] = walk_forward(
+            df["close"], list(wf["windows"]), int(wf["folds"]), bt_cfg)
+        logger.info(
+            "Walk-forward — out-of-sample sharpe=%.2f over %d folds",
+            out["walk_forward"]["out_of_sample_sharpe_annualized"], int(wf["folds"]),
+        )
+    return out
 
 
 def write_metrics(output_path: str, metrics: dict):
@@ -137,6 +161,10 @@ def main():
             "seed": config["seed"],
             "status": "success",
         }
+
+        if "backtest" in config:
+            metrics["backtest"] = run_backtests(df, signal, config, logger)
+            metrics["latency_ms"] = round((time.time() - start_time) * 1000)
 
         write_metrics(args.output, metrics)
         logger.info(
